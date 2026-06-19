@@ -1,0 +1,14 @@
+# Fichiers à NE PAS déployer sur Vercel
+# (seuls index.html et shops.js sont nécessaires pour la carte)
+
+# Sauvegardes des anciennes versions
+_backup_*
+
+# Anciennes cartes monolithiques
+carte_cremiers_*.html
+
+# Scripts Python de géocodage
+*.py
+
+# Config interne Claude / preview
+.claude

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Carte des Crémiers-Fromagers — FFF</title>
+
+  <!-- ============================================================= -->
+  <!-- LIBS EXTERNES                                                 -->
+  <!--   - Leaflet (carte)                                           -->
+  <!--   - Leaflet.markercluster (clustering)                        -->
+  <!--   - PapaParse (parsing du CSV Google Sheets)                  -->
+  <!-- ============================================================= -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+
+  <!-- ============================================================= -->
+  <!-- CONFIG                                                        -->
+  <!-- Toute la configuration du projet est ici. Pour modifier la    -->
+  <!-- carte (source, couleurs, textes), il suffit d'éditer ce bloc. -->
+  <!-- ============================================================= -->
+  <script>
+    window.CONFIG = {
+
+      /* --- Source de données (Google Sheets publié en CSV) --- */
+      SHEET_CSV_URL:
+        "https://docs.google.com/spreadsheets/d/e/2PACX-1vRZ2605JBoeaUafh4M9qR5JKA6gRp5ibDzisW2pAaBlCsAAbmmg3JvlJAa_F2I7Xy7gVIP_16KZ5RDQ/pub?output=csv",
+
+      /* --- Couleurs branding FFF --- */
+      COULEUR_CREMIER:   "#FFD300",  // marqueur crémier-fromager (doré)
+      COULEUR_GROSSISTE: "#1E78C8",  // marqueur grossiste (bleu) — à venir
+      COULEUR_ADHERENT:  "#1FA75A",  // contour vert des adhérents FFF
+
+      /* --- Carte --- */
+      CENTRE_CARTE: [46.6, 2.4],     // centre France métropolitaine
+      ZOOM_INITIAL: 6,
+      ZOOM_GEOLOC:  13,              // zoom après géolocalisation utilisateur
+      FOND_CARTE:   "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+      ATTRIBUTION:  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+
+      /* --- Logique métier --- */
+      VALEUR_ADHERENT: "Adhérent",   // valeur de la colonne Syndicat = membre FFF
+      VALEUR_GROSSISTE: "Grossiste", // valeur (future) de la colonne Type = grossiste
+
+      /* --- Noms des colonnes dans le Google Sheets --- */
+      COLS: {
+        clef:      "Clef",
+        enseigne:  "Enseigne",
+        rue:       "Rue 1",
+        rue2:      "Adresse, Rue 2",
+        rue3:      "Adresse, Rue 3",
+        cp:        "CP",
+        commune:   "Commune",
+        telephone: "Coordonnées, téléphone",
+        mobile:    "Coordonnées, mobile",
+        syndicat:  "Syndicat",
+        type:      "Type",            // colonne facultative (grossistes, à venir)
+        latitude:  "Latitude",
+        longitude: "Longitude",
+      },
+
+      /* --- Textes de l'interface --- */
+      TXT: {
+        titre:        "Crémiers-Fromagers",
+        sousTitre:    "Fédération des Fromagers de France",
+        chargement:   "Chargement des données…",
+        erreur:       "Impossible de charger les données. Réessayez plus tard.",
+        recherchePh:  "Rechercher un nom ou une commune…",
+        toutesRegions:"Toutes les régions",
+        tousDepts:    "Tous les départements",
+        tousArr:      "Tous les arrondissements",
+        adherentsOnly:"Adhérents FFF uniquement",
+        nonGeoToggle: "Afficher les non-géolocalisés",
+        exportBtn:    "Exporter (CSV)",
+        geolocBtn:    "Me géolocaliser",
+        compteur:     "établissement(s) affiché(s)",
+      },
+    };
+  </script>
+
+
+  <!-- ============================================================= -->
+  <!-- STYLES                                                        -->
+  <!-- ============================================================= -->
+  <style>
+    /* --- Variables CSS --- */
+    :root {
+      --jaune: #FFD300;
+      --bleu: #1E78C8;
+      --vert: #1FA75A;
+      --bg: #faf7f2;
+      --panel: #ffffff;
+      --border: #e8e1d4;
+      --text: #2a2420;
+      --muted: #77695c;
+      --shadow: 0 2px 10px rgba(58, 42, 22, 0.10);
+      --radius: 10px;
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color: var(--text); background: var(--bg);
+    }
+
+    /* --- Layout général --- */
+    #app { display: flex; height: 100vh; overflow: hidden; }
+
+    #sidebar {
+      width: 360px; min-width: 360px;
+      background: var(--panel);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      z-index: 1000; box-shadow: var(--shadow);
+    }
+
+    #map { flex: 1; height: 100%; }
+
+    /* --- En-tête / branding FFF --- */
+    .header {
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--border);
+      border-top: 5px solid var(--jaune);
+    }
+    .header h1 { margin: 0; font-size: 20px; letter-spacing: -0.3px; }
+    .header p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+
+    /* --- Zone défilante des contrôles --- */
+    .controls { padding: 16px 20px; overflow-y: auto; flex: 1; }
+    .field { margin-bottom: 14px; }
+    .field label {
+      display: block; font-size: 12px; font-weight: 600;
+      color: var(--muted); margin-bottom: 5px; text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+
+    input[type="search"], select {
+      width: 100%; padding: 9px 11px; font-size: 14px;
+      border: 1px solid var(--border); border-radius: 8px;
+      background: #fff; color: var(--text); font-family: inherit;
+    }
+    input[type="search"]:focus, select:focus {
+      outline: none; border-color: var(--jaune);
+      box-shadow: 0 0 0 3px rgba(255, 211, 0, 0.25);
+    }
+    select:disabled { background: #f4f0ea; color: var(--muted); cursor: not-allowed; }
+
+    /* --- Toggles (cases à cocher) --- */
+    .toggle {
+      display: flex; align-items: center; gap: 9px;
+      font-size: 14px; cursor: pointer; padding: 4px 0;
+    }
+    .toggle input { width: 16px; height: 16px; accent-color: var(--vert); cursor: pointer; }
+
+    /* --- Boutons --- */
+    .btn {
+      width: 100%; padding: 10px 14px; font-size: 14px; font-weight: 600;
+      border: none; border-radius: 8px; cursor: pointer; font-family: inherit;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      margin-top: 8px; transition: filter .15s;
+    }
+    .btn:hover { filter: brightness(0.95); }
+    .btn-primary { background: var(--jaune); color: #2a2420; }
+    .btn-secondary { background: #f0ece4; color: var(--text); border: 1px solid var(--border); }
+
+    /* --- Compteur --- */
+    .compteur {
+      margin: 6px 0 14px; padding: 10px 12px;
+      background: #fffaf0; border: 1px solid var(--border);
+      border-radius: 8px; font-size: 14px;
+    }
+    .compteur strong { font-size: 18px; color: var(--jaune); filter: brightness(0.7); }
+
+    /* --- Légende --- */
+    .legende { font-size: 12px; color: var(--muted); margin-top: 16px; line-height: 1.9; }
+    .pastille {
+      display: inline-block; width: 12px; height: 12px; border-radius: 50%;
+      vertical-align: middle; margin-right: 6px;
+    }
+
+    /* --- Liste des non-géolocalisés --- */
+    .non-geo-liste {
+      margin-top: 10px; max-height: 220px; overflow-y: auto;
+      border: 1px solid var(--border); border-radius: 8px; font-size: 13px;
+    }
+    .non-geo-liste .item { padding: 8px 11px; border-bottom: 1px solid var(--border); }
+    .non-geo-liste .item:last-child { border-bottom: none; }
+    .non-geo-liste .item strong { display: block; }
+    .non-geo-liste .item span { color: var(--muted); font-size: 12px; }
+    .badge-warn {
+      display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 6px;
+      background: #fff3cd; color: #8a6d00; margin-left: 6px;
+    }
+
+    /* --- États (chargement / erreur) --- */
+    .status { padding: 14px 20px; font-size: 14px; color: var(--muted); }
+    .status.error { color: #b3261e; }
+
+    /* --- Marqueurs personnalisés --- */
+    .marqueur {
+      width: 18px; height: 18px; border-radius: 50%;
+      border: 2px solid rgba(0,0,0,0.25);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    }
+    .marqueur.adherent { border: 3px solid var(--vert); }
+
+    /* --- Popups --- */
+    .popup-titre { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .popup-ligne { font-size: 13px; margin: 2px 0; color: var(--text); }
+    .popup-ligne .lbl { color: var(--muted); }
+    .popup-adherent { color: var(--vert); font-weight: 600; }
+
+    /* --- Responsive --- */
+    @media (max-width: 720px) {
+      #app { flex-direction: column; }
+      #sidebar { width: 100%; min-width: 0; max-height: 45vh; }
+      #map { height: 55vh; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================= -->
+  <!-- UI — STRUCTURE HTML                                            -->
+  <!-- ============================================================= -->
+  <div id="app">
+
+    <!-- ----- Barre latérale ----- -->
+    <aside id="sidebar">
+
+      <!-- En-tête / branding FFF -->
+      <div class="header">
+        <h1 id="titre"></h1>
+        <p id="sous-titre"></p>
+      </div>
+
+      <!-- État de chargement / message d'erreur -->
+      <div id="status" class="status"></div>
+
+      <!-- Contrôles -->
+      <div class="controls">
+
+        <!-- Recherche -->
+        <div class="field">
+          <label for="recherche">Recherche</label>
+          <input type="search" id="recherche" />
+        </div>
+
+        <!-- Filtres en cascade -->
+        <div class="field">
+          <label for="filtre-region">Région</label>
+          <select id="filtre-region"></select>
+        </div>
+        <div class="field">
+          <label for="filtre-departement">Département</label>
+          <select id="filtre-departement" disabled></select>
+        </div>
+        <div class="field" id="champ-arrondissement" style="display:none;">
+          <label for="filtre-arrondissement">Arrondissement (Paris)</label>
+          <select id="filtre-arrondissement"></select>
+        </div>
+
+        <!-- Toggles -->
+        <div class="field">
+          <label class="toggle">
+            <input type="checkbox" id="toggle-adherents" />
+            <span id="lbl-adherents"></span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="toggle-nongeo" />
+            <span id="lbl-nongeo"></span>
+          </label>
+        </div>
+
+        <!-- Compteur -->
+        <div class="compteur">
+          <strong id="compteur-nb">0</strong> <span id="compteur-txt"></span>
+        </div>
+
+        <!-- Boutons -->
+        <button class="btn btn-primary" id="btn-export"></button>
+        <button class="btn btn-secondary" id="btn-geoloc"></button>
+
+        <!-- Liste des non-géolocalisés (cachée par défaut) -->
+        <div id="non-geo-wrap" style="display:none;">
+          <div class="field" style="margin-top:16px;">
+            <label>Établissements non géolocalisés</label>
+            <div id="non-geo-liste" class="non-geo-liste"></div>
+          </div>
+        </div>
+
+        <!-- Légende -->
+        <div class="legende">
+          <div><span class="pastille" style="background:var(--jaune)"></span> Crémier-fromager</div>
+          <div><span class="pastille" style="background:var(--bleu)"></span> Grossiste</div>
+          <div><span class="pastille" style="border:3px solid var(--vert);width:10px;height:10px;background:transparent"></span> Adhérent FFF</div>
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- ----- Carte ----- -->
+    <main id="map"></main>
+
+  </div>
+
+  <!-- Logique applicative -->
+  <script src="shops.js"></script>
+</body>
+</html>
