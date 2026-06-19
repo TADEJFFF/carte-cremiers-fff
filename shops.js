@@ -135,6 +135,12 @@ const DEPARTEMENTS = {
   "976": { nom: "Mayotte", region: "Mayotte" },
 };
 
+/* Normalise un code postal : rajoute le zéro initial perdu (ex. "1700" -> "01700") */
+function normaliserCP(cp) {
+  const c = (cp || "").trim();
+  return c.length === 4 ? "0" + c : c;   // CP français = 5 chiffres
+}
+
 /* Déduit le code département à partir d'un code postal */
 function deptDepuisCP(cp) {
   if (!cp || cp.length < 2) return "";
@@ -184,7 +190,7 @@ function parseCoord(valeur) {
 function normalizeShop(row) {
   const get = (col) => (row[col] || "").toString().trim();
 
-  const cp = get(C.cp);
+  const cp = normaliserCP(get(C.cp));
   const dept = deptDepuisCP(cp);
   const infoDept = DEPARTEMENTS[dept] || { nom: "", region: "" };
   const type = get(C.type);
