@@ -314,7 +314,7 @@ function initMap() {
 /* Construit une icône colorée (doré/bleu + contour vert si adhérent) */
 function makeIcon(shop) {
   const couleur = shop.grossiste ? CONFIG.COULEUR_GROSSISTE : CONFIG.COULEUR_CREMIER;
-  const cls = "marqueur" + (shop.adherent ? " adherent" : "");
+  const cls = "marqueur" + (shop.grossiste ? " grossiste" : "") + (shop.adherent ? " adherent" : "");
   return L.divIcon({
     className: "",
     html: `<div class="${cls}" style="background:${couleur}"></div>`,
