@@ -24,6 +24,7 @@ const FILTRES = {
   arrondissement: "",
   recherche: "",
   adherentsOnly: false,
+  grossistesOnly: false,
 };
 
 
@@ -231,6 +232,7 @@ function applyFilters() {
   const q = FILTRES.recherche.toLowerCase();
   return APP.shops.filter((s) => {
     if (FILTRES.adherentsOnly && !s.adherent) return false;
+    if (FILTRES.grossistesOnly && !s.grossiste) return false;
     if (FILTRES.region && s.region !== FILTRES.region) return false;
     if (FILTRES.departement && s.departement !== FILTRES.departement) return false;
     if (FILTRES.arrondissement && s.arrondissement !== FILTRES.arrondissement) return false;
@@ -436,6 +438,7 @@ function injecterTextes() {
   document.getElementById("sous-titre").textContent = T.sousTitre;
   document.getElementById("recherche").placeholder = T.recherchePh;
   document.getElementById("lbl-adherents").textContent = T.adherentsOnly;
+  document.getElementById("lbl-grossistes").textContent = T.grossistesOnly;
   document.getElementById("lbl-nongeo").textContent = T.nonGeoToggle;
   document.getElementById("btn-export").textContent = T.exportBtn;
   document.getElementById("btn-geoloc").textContent = T.geolocBtn;
@@ -472,6 +475,11 @@ function bindControls() {
 
   document.getElementById("toggle-adherents").addEventListener("change", (e) => {
     FILTRES.adherentsOnly = e.target.checked;
+    refresh();
+  });
+
+  document.getElementById("toggle-grossistes").addEventListener("change", (e) => {
+    FILTRES.grossistesOnly = e.target.checked;
     refresh();
   });
 
