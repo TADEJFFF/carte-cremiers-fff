@@ -402,28 +402,6 @@ function renderUnlocated() {
   `).join("");
 }
 
-/* Échappe une valeur pour le CSV (guillemets si nécessaire) */
-function champCSV(v) {
-  const s = (v === null || v === undefined) ? "" : String(v);
-  return /[",;\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-}
-
-/* Exporte la sélection filtrée courante en CSV */
-function exportCSV() {
-  const entetes = ["Enseigne", "Adresse", "CP", "Commune", "Département", "Région", "Adhérent FFF", "Téléphone", "Latitude", "Longitude"];
-  const lignes = APP.filtered.map((s) => [
-    s.enseigne, s.rue, s.cp, s.commune, `${s.departement} ${s.deptNom}`.trim(),
-    s.region, s.adherent ? "Oui" : "Non", s.telephone, s.lat, s.lng,
-  ].map(champCSV).join(";"));
-  const contenu = "﻿" + [entetes.join(";"), ...lignes].join("\n");
-  const blob = new Blob([contenu], { type: "text/csv;charset=utf-8;" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = "cremiers-fff-export.csv";
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 /* Recalcule la sélection, met à jour carte + compteur (appelé à chaque changement) */
 function refresh() {
   APP.filtered = applyFilters();
@@ -440,7 +418,6 @@ function injecterTextes() {
   document.getElementById("lbl-adherents").textContent = T.adherentsOnly;
   document.getElementById("lbl-grossistes").textContent = T.grossistesOnly;
   document.getElementById("lbl-nongeo").textContent = T.nonGeoToggle;
-  document.getElementById("btn-export").textContent = T.exportBtn;
   document.getElementById("btn-geoloc").textContent = T.geolocBtn;
   document.getElementById("compteur-txt").textContent = T.compteur;
 }
@@ -487,7 +464,6 @@ function bindControls() {
     document.getElementById("non-geo-wrap").style.display = e.target.checked ? "block" : "none";
   });
 
-  document.getElementById("btn-export").addEventListener("click", exportCSV);
   document.getElementById("btn-geoloc").addEventListener("click", locateUser);
 }
 
