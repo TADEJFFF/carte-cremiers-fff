@@ -211,6 +211,12 @@ function normalizeShop(row) {
     grossiste:     type === CONFIG.VALEUR_GROSSISTE,
     lat:           parseCoord(row[C.latitude]),
     lng:           parseCoord(row[C.longitude]),
+    /* Champs sondage grossistes (vides si colonnes absentes du Sheet) */
+    annee:         get(C.annee),
+    salaries:      get(C.salaries),
+    fournisseurs:  get(C.fournisseurs),
+    specialites:   get(C.specialites),
+    labels:        get(C.labels),
   };
 }
 
@@ -326,6 +332,11 @@ function makeIcon(shop) {
   });
 }
 
+/* Échappe le HTML d'un texte libre venant du Sheet */
+function escHTML(t) {
+  return t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
 /* Contenu HTML du popup d'un établissement */
 function popupHTML(s) {
   const adresse = [s.rue, `${s.cp} ${s.commune}`].filter(Boolean).join("<br>");
@@ -333,11 +344,23 @@ function popupHTML(s) {
     ? `<span class="popup-adherent">✓ Adhérent FFF</span>`
     : `<span class="lbl">Non adhérent</span>`;
   const tel = s.telephone ? `<div class="popup-ligne"><span class="lbl">Tél. :</span> ${s.telephone}</div>` : "";
+
+  /* Champs sondage grossistes : une ligne par champ, seulement si rempli */
+  const ligne = (lbl, val) =>
+    val ? `<div class="popup-ligne"><span class="lbl">${lbl} :</span> ${escHTML(val)}</div>` : "";
+  const infos =
+    ligne("Création", s.annee) +
+    ligne("Salariés", s.salaries) +
+    ligne("Fournisseurs", s.fournisseurs) +
+    ligne("Spécialités", s.specialites) +
+    ligne("Labels", s.labels);
+
   return `
     <div class="popup-titre">${s.enseigne}</div>
     <div class="popup-ligne">${adresse}</div>
     <div class="popup-ligne">${adherent}</div>
     ${tel}
+    ${infos}
   `;
 }
 
