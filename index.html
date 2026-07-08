@@ -68,6 +68,13 @@
         fournisseurs: "Nombre de fournisseurs",
         specialites:  "Spécialités",
         labels:       "Labels et certifications",
+        /* Segmentation grossistes (valeurs multiples séparées par ", ") */
+        gammes:            "Gammes",
+        regionsVente:      "Régions de vente",
+        typesFournisseurs: "Types de fournisseurs",
+        typesClients:      "Types de clients",
+        typesTransport:    "Types de transport",
+        typeGrossiste:     "Type de grossiste",
       },
 
       /* --- Textes de l'interface --- */
@@ -83,6 +90,15 @@
         adherentsOnly:"Adhérents FFF uniquement",
         grossistesOnly:"Grossistes uniquement",
         nonGeoToggle: "Afficher les non-géolocalisés",
+        segTitre:        "Segmentation grossistes",
+        segGammes:       "Toutes les gammes",
+        segRegions:      "Toutes les régions de vente",
+        segFournisseurs: "Tous les types de fournisseurs",
+        segClients:      "Tous les types de clients",
+        segTransport:    "Tous les types de transport",
+        segTypeGros:     "Tous les types de grossiste",
+        popupPlus:       "+ d'infos",
+        popupMoins:      "− d'infos",
         geolocBtn:    "Me géolocaliser",
         compteur:     "établissement(s) affiché(s)",
       },
@@ -218,11 +234,23 @@
     .marqueur.adherent { border: 3px solid var(--vert); }
     .marqueur.grossiste { border-radius: 3px; }   /* grossiste = carré bleu */
 
+    /* --- Segmentation grossistes --- */
+    #seg-grossistes { margin: 4px 0 10px 25px; }
+    .seg-titre {
+      display: block; font-size: 12px; font-weight: 600;
+      color: var(--muted); margin-bottom: 5px; text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    select.seg { margin-bottom: 6px; font-size: 13px; }
+
     /* --- Popups --- */
     .popup-titre { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
     .popup-ligne { font-size: 13px; margin: 2px 0; color: var(--text); }
     .popup-ligne .lbl { color: var(--muted); }
     .popup-adherent { color: var(--vert); font-weight: 600; }
+    .popup-plus { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 6px; }
+    .popup-plus-lien { text-align: right; margin-top: 6px; font-size: 12px; }
+    .popup-plus-lien a { color: var(--accent-dark, #8f6431); font-weight: 600; text-decoration: none; }
 
     /* --- Responsive --- */
     @media (max-width: 720px) {
@@ -284,6 +312,17 @@
             <input type="checkbox" id="toggle-grossistes" />
             <span id="lbl-grossistes"></span>
           </label>
+          <!-- Segmentation grossistes (visible quand le toggle grossistes est coché) -->
+          <div id="seg-grossistes" style="display:none;">
+            <label id="seg-titre" class="seg-titre"></label>
+            <select id="seg-gammes" class="seg"></select>
+            <select id="seg-regionsVente" class="seg"></select>
+            <select id="seg-typesFournisseurs" class="seg"></select>
+            <select id="seg-typesClients" class="seg"></select>
+            <select id="seg-typesTransport" class="seg"></select>
+            <select id="seg-typeGrossiste" class="seg"></select>
+          </div>
+
           <label class="toggle">
             <input type="checkbox" id="toggle-nongeo" />
             <span id="lbl-nongeo"></span>

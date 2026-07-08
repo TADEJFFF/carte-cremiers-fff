@@ -25,6 +25,15 @@ const FILTRES = {
   recherche: "",
   adherentsOnly: false,
   grossistesOnly: false,
+  /* Segmentation grossistes : une valeur choisie par catégorie ("" = toutes) */
+  seg: {
+    gammes: "",
+    regionsVente: "",
+    typesFournisseurs: "",
+    typesClients: "",
+    typesTransport: "",
+    typeGrossiste: "",
+  },
 };
 
 
@@ -217,6 +226,13 @@ function normalizeShop(row) {
     fournisseurs:  get(C.fournisseurs),
     specialites:   get(C.specialites),
     labels:        get(C.labels),
+    /* Segmentation grossistes (listes "val1, val2, ...") */
+    gammes:            get(C.gammes),
+    regionsVente:      get(C.regionsVente),
+    typesFournisseurs: get(C.typesFournisseurs),
+    typesClients:      get(C.typesClients),
+    typesTransport:    get(C.typesTransport),
+    typeGrossiste:     get(C.typeGrossiste),
   };
 }
 
@@ -239,6 +255,18 @@ function applyFilters() {
   return APP.shops.filter((s) => {
     if (FILTRES.adherentsOnly && !s.adherent) return false;
     if (FILTRES.grossistesOnly && !s.grossiste) return false;
+    /* Segmentation grossistes : chaque filtre actif doit matcher la liste de la boutique */
+    for (const [cat, val] of Object.entries(FILTRES.seg)) {
+      if (!val) continue;
+      if (!s.grossiste) return false;
+      if (cat === "typeGrossiste") {
+        // "Groupe (X)" est regroupé sous l'option "Groupe"
+        const ok = val === "Groupe" ? s.typeGrossiste.startsWith("Groupe") : s.typeGrossiste === val;
+        if (!ok) return false;
+      } else if (!(s[cat] || "").split(", ").includes(val)) {
+        return false;
+      }
+    }
     if (FILTRES.region && s.region !== FILTRES.region) return false;
     if (FILTRES.departement && s.departement !== FILTRES.departement) return false;
     if (FILTRES.arrondissement && s.arrondissement !== FILTRES.arrondissement) return false;
@@ -306,6 +334,37 @@ function peuplerArrondissements() {
   champ.style.display = "block";
 }
 
+/* Définition des 6 menus de segmentation grossistes : [id select, propriété, libellé "tout"] */
+const SEG_DEFS = [
+  ["seg-gammes",            "gammes",            () => CONFIG.TXT.segGammes],
+  ["seg-regionsVente",      "regionsVente",      () => CONFIG.TXT.segRegions],
+  ["seg-typesFournisseurs", "typesFournisseurs", () => CONFIG.TXT.segFournisseurs],
+  ["seg-typesClients",      "typesClients",      () => CONFIG.TXT.segClients],
+  ["seg-typesTransport",    "typesTransport",    () => CONFIG.TXT.segTransport],
+  ["seg-typeGrossiste",     "typeGrossiste",     () => CONFIG.TXT.segTypeGros],
+];
+
+/* Peuple les 6 menus de segmentation à partir des valeurs présentes chez les grossistes */
+function peuplerSegGrossistes() {
+  const grossistes = APP.shops.filter((s) => s.grossiste);
+  SEG_DEFS.forEach(([id, prop, labelTout]) => {
+    const valeurs = new Set();
+    grossistes.forEach((s) => {
+      (s[prop] || "").split(", ").filter(Boolean).forEach((v) => {
+        // les "Groupe (X)" sont regroupés sous une seule option "Groupe"
+        valeurs.add(prop === "typeGrossiste" && v.startsWith("Groupe") ? "Groupe" : v);
+      });
+    });
+    remplirSelect(document.getElementById(id), uniqueTriees([...valeurs]), labelTout());
+  });
+}
+
+/* Réinitialise la segmentation (valeurs + menus) */
+function resetSegGrossistes() {
+  Object.keys(FILTRES.seg).forEach((k) => (FILTRES.seg[k] = ""));
+  SEG_DEFS.forEach(([id]) => { const el = document.getElementById(id); if (el) el.value = ""; });
+}
+
 
 /* =================================================================
  * 3. MAP — Carte Leaflet + marqueurs + clustering
@@ -355,12 +414,31 @@ function popupHTML(s) {
     ligne("Spécialités", s.specialites) +
     ligne("Labels", s.labels);
 
+  /* Section repliée "+ d'infos" : les 6 catégories de segmentation, si renseignées */
+  const plusLignes =
+    ligne("Gammes", s.gammes) +
+    ligne("Régions de vente", s.regionsVente) +
+    ligne("Fournisseurs", s.typesFournisseurs) +
+    ligne("Clients", s.typesClients) +
+    ligne("Transport", s.typesTransport) +
+    ligne("Type", s.typeGrossiste);
+  const plus = plusLignes
+    ? `<div class="popup-plus" style="display:none">${plusLignes}</div>
+       <div class="popup-plus-lien"><a href="#" onclick="
+         var d = this.closest('.leaflet-popup-content').querySelector('.popup-plus');
+         var ouvert = d.style.display === 'none';
+         d.style.display = ouvert ? 'block' : 'none';
+         this.textContent = ouvert ? CONFIG.TXT.popupMoins : CONFIG.TXT.popupPlus;
+         return false;">${CONFIG.TXT.popupPlus}</a></div>`
+    : "";
+
   return `
     <div class="popup-titre">${s.enseigne}</div>
     <div class="popup-ligne">${adresse}</div>
     <div class="popup-ligne">${adherent}</div>
     ${tel}
     ${infos}
+    ${plus}
   `;
 }
 
@@ -440,6 +518,7 @@ function injecterTextes() {
   document.getElementById("recherche").placeholder = T.recherchePh;
   document.getElementById("lbl-adherents").textContent = T.adherentsOnly;
   document.getElementById("lbl-grossistes").textContent = T.grossistesOnly;
+  document.getElementById("seg-titre").textContent = T.segTitre;
   document.getElementById("lbl-nongeo").textContent = T.nonGeoToggle;
   document.getElementById("btn-geoloc").textContent = T.geolocBtn;
   document.getElementById("compteur-txt").textContent = T.compteur;
@@ -480,7 +559,17 @@ function bindControls() {
 
   document.getElementById("toggle-grossistes").addEventListener("change", (e) => {
     FILTRES.grossistesOnly = e.target.checked;
+    // la segmentation n'est visible (et active) que si le toggle est coché
+    document.getElementById("seg-grossistes").style.display = e.target.checked ? "block" : "none";
+    if (!e.target.checked) resetSegGrossistes();
     refresh();
+  });
+
+  SEG_DEFS.forEach(([id, prop]) => {
+    document.getElementById(id).addEventListener("change", (e) => {
+      FILTRES.seg[prop] = e.target.value;
+      refresh();
+    });
   });
 
   document.getElementById("toggle-nongeo").addEventListener("change", (e) => {
@@ -502,6 +591,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   try {
     await loadShops();
     peuplerRegions();
+    peuplerSegGrossistes();
     renderUnlocated();
     refresh();
     setStatus("", false);
