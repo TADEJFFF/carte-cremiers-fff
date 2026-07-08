@@ -263,7 +263,7 @@ function applyFilters() {
         // "Groupe (X)" est regroupé sous l'option "Groupe"
         const ok = val === "Groupe" ? s.typeGrossiste.startsWith("Groupe") : s.typeGrossiste === val;
         if (!ok) return false;
-      } else if (!(s[cat] || "").split(", ").includes(val)) {
+      } else if (!(s[cat] || "").split(", ").some((v) => v.toLowerCase() === val.toLowerCase())) {
         return false;
       }
     }
@@ -344,18 +344,21 @@ const SEG_DEFS = [
   ["seg-typeGrossiste",     "typeGrossiste",     () => CONFIG.TXT.segTypeGros],
 ];
 
-/* Peuple les 6 menus de segmentation à partir des valeurs présentes chez les grossistes */
+/* Peuple les 6 menus de segmentation à partir des valeurs présentes chez les grossistes.
+   Les variantes de casse ("charcuterie"/"Charcuterie") sont fusionnées en une seule option. */
 function peuplerSegGrossistes() {
   const grossistes = APP.shops.filter((s) => s.grossiste);
   SEG_DEFS.forEach(([id, prop, labelTout]) => {
-    const valeurs = new Set();
+    const valeurs = new Map(); // clé en minuscules -> libellé affiché
     grossistes.forEach((s) => {
       (s[prop] || "").split(", ").filter(Boolean).forEach((v) => {
         // les "Groupe (X)" sont regroupés sous une seule option "Groupe"
-        valeurs.add(prop === "typeGrossiste" && v.startsWith("Groupe") ? "Groupe" : v);
+        if (prop === "typeGrossiste" && v.startsWith("Groupe")) v = "Groupe";
+        const cle = v.toLowerCase();
+        if (!valeurs.has(cle)) valeurs.set(cle, v.charAt(0).toUpperCase() + v.slice(1));
       });
     });
-    remplirSelect(document.getElementById(id), uniqueTriees([...valeurs]), labelTout());
+    remplirSelect(document.getElementById(id), uniqueTriees([...valeurs.values()]), labelTout());
   });
 }
 
