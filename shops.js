@@ -176,9 +176,9 @@ function arrondissementDepuisCP(cp) {
  * 1. DATA — Récupération + parsing du CSV Google Sheets
  * ================================================================= */
 
-/* Récupère le CSV brut depuis le Google Sheets */
-async function fetchCSV() {
-  const res = await fetch(CONFIG.SHEET_CSV_URL);
+/* Récupère un CSV brut depuis le Google Sheets (une URL par onglet) */
+async function fetchCSV(url) {
+  const res = await fetch(url);
   if (!res.ok) throw new Error("HTTP " + res.status);
   return res.text();
 }
@@ -196,8 +196,9 @@ function parseCoord(valeur) {
   return isNaN(n) ? null : n;
 }
 
-/* Nettoie + structure une ligne brute du CSV en objet établissement */
-function normalizeShop(row) {
+/* Nettoie + structure une ligne brute du CSV en objet établissement.
+   estGrossiste : true pour les lignes venant de l'onglet Grossistes. */
+function normalizeShop(row, estGrossiste) {
   const get = (col) => (row[col] || "").toString().trim();
 
   const cp = normaliserCP(get(C.cp));
@@ -217,7 +218,7 @@ function normalizeShop(row) {
     deptNom:       infoDept.nom,
     arrondissement: arrondissementDepuisCP(cp),
     adherent:      get(C.syndicat) === CONFIG.VALEUR_ADHERENT,
-    grossiste:     type === CONFIG.VALEUR_GROSSISTE,
+    grossiste:     estGrossiste || type === CONFIG.VALEUR_GROSSISTE,
     lat:           parseCoord(row[C.latitude]),
     lng:           parseCoord(row[C.longitude]),
     /* Champs sondage grossistes (vides si colonnes absentes du Sheet) */
@@ -236,10 +237,14 @@ function normalizeShop(row) {
   };
 }
 
-/* Orchestre fetch -> parse -> normalise, puis sépare géo / non-géo */
+/* Orchestre fetch (2 onglets en parallèle) -> parse -> normalise, puis sépare géo / non-géo */
 async function loadShops() {
-  const texte = await fetchCSV();
-  const lignes = parseCSV(texte).map(normalizeShop);
+  const [txtCremiers, txtGrossistes] = await Promise.all([
+    fetchCSV(CONFIG.SHEET_CREMIERS_URL),
+    fetchCSV(CONFIG.SHEET_GROSSISTES_URL),
+  ]);
+  const lignes = parseCSV(txtCremiers).map((r) => normalizeShop(r, false))
+    .concat(parseCSV(txtGrossistes).map((r) => normalizeShop(r, true)));
   APP.shops     = lignes.filter((s) => s.lat !== null && s.lng !== null);
   APP.unlocated = lignes.filter((s) => s.lat === null || s.lng === null);
 }
