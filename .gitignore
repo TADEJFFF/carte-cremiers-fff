@@ -1,4 +1,5 @@
-# Sauvegardes des anciennes versions
+# Archives locales (anciennes versions, fichiers de travail)
+_archives/
 _backup_*
 
 # Anciennes cartes monolithiques
@@ -7,9 +8,15 @@ carte_cremiers_*.html
 # Scripts Python de géocodage (non nécessaires pour la carte)
 *.py
 
+# Fichiers de travail données (préparation Sheet)
+*.xlsx
+*.csv
+
+# Fichiers temporaires Excel
+~$*
+
 # Config interne Claude / preview
 .claude/
 
 # Divers
-*.csv
 .DS_Store
